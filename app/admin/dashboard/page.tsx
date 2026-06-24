@@ -1,148 +1,145 @@
+'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { 
+  Users, 
+  BriefcaseBusiness, 
+  Building2, 
+  FileText, 
+  ShieldCheck,
+  LayoutDashboard
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { mockUsers, mockJobs, mockCompanies, mockApplications } from '@/lib/mock-data';
 
-const USERS = [
-  { id: 'u1', name: 'Abebe Bekele',    email: 'abebe@email.com',  role: 'JOB_SEEKER', status: 'ACTIVE',   joined: '2026-06-01' },
-  { id: 'u2', name: 'Marta Girma',     email: 'marta@email.com',  role: 'JOB_SEEKER', status: 'ACTIVE',   joined: '2026-06-05' },
-  { id: 'u3', name: 'Ethio Telecom',   email: 'hr@et.et',          role: 'EMPLOYER',   status: 'ACTIVE',   joined: '2026-05-20' },
-  { id: 'u4', name: 'Dawit Finance',   email: 'dawit@dfin.et',    role: 'EMPLOYER',   status: 'PENDING',  joined: '2026-06-18' },
-  { id: 'u5', name: 'Hana Tadesse',    email: 'hana@email.com',   role: 'JOB_SEEKER', status: 'SUSPENDED',joined: '2026-04-12' },
-];
+export default function AdminDashboard() {
+  const { data: session, status } = useSession();
+  const [, forceUpdate] = useState(0);
 
-const JOBS = [
-  { id: 'j1', title: 'Senior Software Engineer',  company: 'Ethio Telecom',  status: 'APPROVED',  applicants: 42, featured: true  },
-  { id: 'j2', title: 'Finance Officer',            company: 'Dashen Bank',    status: 'PENDING',   applicants: 12, featured: false },
-  { id: 'j3', title: 'Marketing Manager',          company: 'Safaricom',      status: 'APPROVED',  applicants: 28, featured: false },
-  { id: 'j4', title: 'Suspicious Job Post',        company: 'Unknown Corp',   status: 'FLAGGED',   applicants: 3,  featured: false },
-];
+  // Periodically refresh data
+  useEffect(() => {
+    const interval = setInterval(() => forceUpdate(prev => prev + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
-const STATS = [
-  { label: 'Total Users', value: 18400, icon: '👥', color: '#a5b4fc' },
-  { label: 'Employers', value: 3200,   icon: '🏢', color: '#6ee7b7' },
-  { label: 'Active Jobs', value: 12400, icon: '💼', color: '#fbbf24' },
-  { label: 'Applications', value: 89600, icon: '📤', color: '#f59e0b' },
-];
+  const stats = [
+    { label: 'Total Users', value: mockUsers.length, icon: Users, color: 'text-indigo-400', bg: 'bg-indigo-500/10' },
+    { label: 'Total Jobs', value: mockJobs.length, icon: BriefcaseBusiness, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+    { label: 'Total Companies', value: mockCompanies.length, icon: Building2, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+    { label: 'Total Applications', value: mockApplications.length, icon: FileText, color: 'text-rose-400', bg: 'bg-rose-500/10' },
+  ];
 
-const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  ACTIVE:     { label: 'Active',    className: 'badge badge-green'  },
-  PENDING:    { label: 'Pending',   className: 'badge badge-amber'  },
-  SUSPENDED:  { label: 'Suspended', className: 'badge badge-rose'   },
-  APPROVED:   { label: 'Approved',  className: 'badge badge-green'  },
-  FLAGGED:    { label: 'Flagged',   className: 'badge badge-rose'   },
-};
-
-export default function AdminDashboardPage() {
   return (
     <div className="page-content">
       <div className="container">
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <span className="badge badge-purple" style={{ marginBottom: '0.75rem' }}>Admin Panel</span>
-            <h1 style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.03em' }}>
-              <span className="gradient-text">Et_vacancy</span> Admin
+            <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2">
+              <ShieldCheck className="w-7 h-7 text-amber-400" />
+              Admin Dashboard
             </h1>
-            <p style={{ color: 'var(--text-muted)' }}>Platform management and oversight</p>
+            <p className="text-muted-foreground mt-1">
+              Manage your platform, users, and jobs
+            </p>
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid-4 stagger-children" style={{ marginBottom: '2.5rem' }}>
-          {STATS.map(s => (
-            <div key={s.label} className="stat-card animate-fade-in-up">
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div>
-                  <div className="stat-value" style={{ color: s.color }}>{s.value.toLocaleString()}</div>
-                  <div className="stat-label">{s.label}</div>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {stats.map((stat, index) => (
+            <div key={index} className="glass-panel p-6">
+              <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-xl ${stat.bg} flex items-center justify-center`}>
+                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
                 </div>
-                <span style={{ fontSize: '1.75rem' }}>{s.icon}</span>
+                <div>
+                  <div className="text-2xl font-bold">{stat.value}</div>
+                  <div className="text-sm text-muted-foreground">{stat.label}</div>
+                </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Section: Pending Employer Approvals */}
-        <div style={{ marginBottom: '2.5rem' }}>
-          <h2 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            🕐 Pending Employer Approvals
-            <span className="badge badge-amber">{USERS.filter(u => u.status === 'PENDING').length}</span>
-          </h2>
-          <div className="table-wrapper">
-            <table>
-              <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
-              <tbody>
-                {USERS.map(user => {
-                  const badge = STATUS_BADGE[user.status] || { label: user.status, className: 'badge' };
-                  return (
-                    <tr key={user.id}>
-                      <td style={{ fontWeight: 600 }}>{user.name}</td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{user.email}</td>
-                      <td><span className="badge badge-blue">{user.role.replace('_', ' ')}</span></td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{new Date(user.joined).toLocaleDateString()}</td>
-                      <td><span className={badge.className}>{badge.label}</span></td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          {user.status === 'PENDING' && <button className="btn-success" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem' }}>Approve</button>}
-                          {user.status === 'ACTIVE' && <button className="btn-danger" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem' }}>Suspend</button>}
-                          {user.status === 'SUSPENDED' && <button className="btn-success" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem' }}>Reinstate</button>}
-                          <button className="btn-danger" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem' }}>Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        {/* Dashboard Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Recent Users */}
+          <div className="glass-panel p-6">
+            <h2 className="text-xl font-semibold mb-4">Recent Users</h2>
+            <div className="space-y-3">
+              {mockUsers.slice(0, 5).reverse().map((user) => (
+                <div key={user.id} className="flex items-center justify-between p-3 bg-accent/20 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center font-bold text-white text-sm">
+                      {user.name.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="font-medium">{user.name}</div>
+                      <div className="text-xs text-muted-foreground">{user.email}</div>
+                    </div>
+                  </div>
+                  <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    user.role === 'ADMIN' ? 'bg-amber-500/20 text-amber-400' :
+                    user.role === 'EMPLOYER' ? 'bg-emerald-500/20 text-emerald-400' :
+                    'bg-indigo-500/20 text-indigo-400'
+                  }`}>
+                    {user.role === 'ADMIN' ? 'Admin' : user.role === 'EMPLOYER' ? 'Employer' : 'Job Seeker'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recent Jobs */}
+          <div className="glass-panel p-6">
+            <h2 className="text-xl font-semibold mb-4">Recent Jobs</h2>
+            <div className="space-y-3">
+              {mockJobs.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No jobs posted yet
+                </div>
+              ) : (
+                mockJobs.slice(0, 5).map((job) => (
+                  <div key={job.id} className="flex items-center justify-between p-3 bg-accent/20 rounded-lg">
+                    <div>
+                      <div className="font-medium">{job.title}</div>
+                      <div className="text-xs text-muted-foreground">{job.company.name} · {job.location}</div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {job.applicantsCount} applicants
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Section: Job Moderation */}
-        <div style={{ marginBottom: '2.5rem' }}>
-          <h2 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            💼 Job Moderation
-            <span className="badge badge-rose">{JOBS.filter(j => j.status === 'FLAGGED' || j.status === 'PENDING').length} need review</span>
-          </h2>
-          <div className="table-wrapper">
-            <table>
-              <thead><tr><th>Job Title</th><th>Company</th><th>Applicants</th><th>Featured</th><th>Status</th><th>Actions</th></tr></thead>
-              <tbody>
-                {JOBS.map(job => {
-                  const badge = STATUS_BADGE[job.status] || { label: job.status, className: 'badge' };
-                  return (
-                    <tr key={job.id}>
-                      <td style={{ fontWeight: 600 }}>{job.title}</td>
-                      <td style={{ color: 'var(--text-secondary)' }}>{job.company}</td>
-                      <td><span className="badge badge-purple">{job.applicants}</span></td>
-                      <td>{job.featured ? <span className="badge badge-amber">⭐ Yes</span> : <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>—</span>}</td>
-                      <td><span className={badge.className}>{badge.label}</span></td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          {job.status === 'PENDING' && <button className="btn-success" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem' }}>Approve</button>}
-                          {!job.featured && <button className="btn-primary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem' }}>Feature</button>}
-                          <button className="btn-danger" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem' }}>Remove</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        {/* Quick Actions */}
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Button asChild variant="outline" className="h-auto py-6 flex-col gap-2">
+              <Link href="/jobs">
+                <BriefcaseBusiness className="w-6 h-6" />
+                <span>Manage Jobs</span>
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="h-auto py-6 flex-col gap-2">
+              <Link href="/companies">
+                <Building2 className="w-6 h-6" />
+                <span>View Companies</span>
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="h-auto py-6 flex-col gap-2">
+              <Link href="/">
+                <LayoutDashboard className="w-6 h-6" />
+                <span>Go to Home</span>
+              </Link>
+            </Button>
           </div>
-        </div>
-
-        {/* Quick Links */}
-        <div className="grid-4">
-          {[
-            { label: 'Manage Categories', href: '/admin/categories', icon: '🗂️', desc: 'Add, edit or remove job categories' },
-            { label: 'Reports', href: '/admin/reports', icon: '📊', desc: 'View monthly statistics and insights' },
-            { label: 'Content Management', href: '/admin/content', icon: '📝', desc: 'FAQs, Blog, Terms & Privacy' },
-            { label: 'User Roles', href: '/admin/roles', icon: '🔐', desc: 'Manage user permissions and roles' },
-          ].map(item => (
-            <Link key={item.label} href={item.href} className="card" style={{ textDecoration: 'none', display: 'block' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>{item.icon}</div>
-              <h3 style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.3rem' }}>{item.label}</h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{item.desc}</p>
-            </Link>
-          ))}
         </div>
       </div>
     </div>

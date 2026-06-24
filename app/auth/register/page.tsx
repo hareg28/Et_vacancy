@@ -1,160 +1,349 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { User, Mail, Lock, UserPlus, Loader2, Eye, EyeOff, BriefcaseBusiness, Building2, ShieldCheck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
-type Role = 'JOB_SEEKER' | 'EMPLOYER';
+// Form validation schema
+const registerSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Please enter a valid email'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  confirmPassword: z.string(),
+  role: z.enum(['JOB_SEEKER', 'EMPLOYER'] as const),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+});
+
+type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
-  const [role, setRole] = useState<Role>('JOB_SEEKER');
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Redirect if already logged in
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      role: 'JOB_SEEKER',
+    },
+  });
+
+  const [selectedRole, setSelectedRole] = useState<'JOB_SEEKER' | 'EMPLOYER'>('JOB_SEEKER');
+
+  // Redirect if already authenticated
   useEffect(() => {
-    if (session?.user) {
-      const role = (session.user as any).role;
-      if (role === 'EMPLOYER') {
+    if (status === 'authenticated') {
+      const role = (session?.user as any)?.role;
+      if (role === 'ADMIN') {
+        router.push('/admin/dashboard');
+      } else if (role === 'EMPLOYER') {
         router.push('/employer/dashboard');
       } else {
         router.push('/dashboard');
       }
     }
-  }, [session, router]);
+  }, [status, session, router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (form.password !== form.confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-
-    if (form.password.length < 8) {
-      setError('Password must be at least 8 characters long.');
-      return;
-    }
-
-    setLoading(true);
+  const onSubmit = async (data: RegisterFormData) => {
     setError('');
+    setIsLoading(true);
 
     try {
-      const res = await fetch('/api/auth/register', {
+      // Register user
+      const registerResult = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: form.name,
-          email: form.email,
-          password: form.password,
-          role,
+          name: data.name,
+          email: data.email,
+          password: data.password,
+          role: data.role,
         }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || 'Registration failed');
+      if (!registerResult.ok) {
+        const errorData = await registerResult.json();
+        setError(errorData.message || 'Registration failed');
         return;
       }
 
-      setSuccess(true);
+      // Automatically sign in after successful registration
+      const signInResult = await signIn('credentials', {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      });
+
+      if (signInResult?.error) {
+        setError('Registration succeeded, but login failed. Please sign in manually.');
+      } else if (signInResult?.ok) {
+        window.location.reload();
+      }
     } catch (err) {
-      setError('Something went wrong. Please try again.');
+      setError('An error occurred. Please try again.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  if (success) {
+  if (status === 'loading') {
     return (
-      <div className="page-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', maxWidth: 440 }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
-          <h2 style={{ fontWeight: 800, fontSize: '1.5rem', marginBottom: '0.5rem' }}>Account Created!</h2>
-          <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Your account has been created successfully. You can now log in.</p>
-          <Link href="/auth/login" className="btn-primary" style={{ justifyContent: 'center' }}>Go to Login</Link>
-        </div>
+      <div className="page-content auth-light flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
+  const roles = [
+    {
+      id: 'JOB_SEEKER',
+      label: 'Job Seeker',
+      description: 'Find your dream job',
+      icon: BriefcaseBusiness,
+    },
+    {
+      id: 'EMPLOYER',
+      label: 'Employer',
+      description: 'Hire talented professionals',
+      icon: Building2,
+    },
+  ];
+
   return (
-    <div className="page-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem 1.5rem', position: 'relative', zIndex: 1, pointerEvents: 'auto' }}>
-      <div style={{ width: '100%', maxWidth: 480, position: 'relative', zIndex: 1000, pointerEvents: 'auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <Link href="/" style={{ fontWeight: 800, fontSize: '1.5rem' }}>
-            <span className="gradient-text">Et</span>_vacancy
-          </Link>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '1.25rem', marginBottom: '0.5rem' }}>Create your account</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Join thousands of professionals on Et_vacancy</p>
-        </div>
-
-        {/* Role Selector */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.5rem', position: 'relative', zIndex: 1000 }}>
-          {(['JOB_SEEKER', 'EMPLOYER'] as Role[]).map(r => (
-            <button key={r} type="button" onClick={() => {
-                console.log(`${r} clicked!`);
-                setRole(r);
-            }} style={{
-              padding: '1rem', borderRadius: 12, border: `2px solid ${role === r ? '#6366f1' : 'var(--border-color)'}`,
-              background: role === r ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)',
-              color: role === r ? '#a5b4fc' : 'var(--text-muted)', cursor: 'pointer',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem',
-              transition: 'all 0.2s ease', fontFamily: 'inherit', pointerEvents: 'auto', position: 'relative',
-              zIndex: 1000,
-            }}>
-              <span style={{ fontSize: '1.5rem' }}>{r === 'JOB_SEEKER' ? '👤' : '🏢'}</span>
-              <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{r === 'JOB_SEEKER' ? 'Job Seeker' : 'Employer'}</span>
-              <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>{r === 'JOB_SEEKER' ? 'Find your next role' : 'Hire top talent'}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="glass-panel" style={{ padding: '2rem', position: 'relative', zIndex: 1000 }}>
-          {error && <div className="alert alert-danger">{error}</div>}
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="name">{role === 'EMPLOYER' ? 'Company Name' : 'Full Name'}</label>
-              <input id="name" type="text" className="form-input" placeholder={role === 'EMPLOYER' ? 'Acme Corp Ltd.' : 'Abebe Bekele'}
-                value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="reg-email">Email address</label>
-              <input id="reg-email" type="email" className="form-input" placeholder="you@example.com"
-                value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
-            </div>
-            <div className="grid-2" style={{ gap: '0.75rem' }}>
-              <div className="form-group">
-                <label className="form-label" htmlFor="reg-password">Password</label>
-                <input id="reg-password" type="password" className="form-input" placeholder="Min. 8 characters"
-                  value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required minLength={8} />
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="confirmPassword">Confirm Password</label>
-                <input id="confirmPassword" type="password" className="form-input" placeholder="Repeat password"
-                  value={form.confirmPassword} onChange={e => setForm({ ...form, confirmPassword: e.target.value })} required />
-              </div>
-            </div>
-            <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-              By signing up, you agree to our{' '}
-              <Link href="/terms-and-conditions" style={{ color: '#a5b4fc' }}>Terms</Link> and{' '}
-              <Link href="/privacy-policy" style={{ color: '#a5b4fc' }}>Privacy Policy</Link>.
+    <div className="page-content auth-light flex items-center justify-center min-h-screen relative z-10">
+      <div className="w-full max-w-lg">
+        <div className="glass-panel p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-extrabold tracking-tight mb-2">
+              Create Account
+            </h1>
+            <p className="text-muted-foreground">
+              Join Et_vacancy and start your journey
             </p>
-            <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.85rem', fontSize: '0.95rem' }} disabled={loading}>
-              {loading ? 'Creating Account...' : `Create ${role === 'EMPLOYER' ? 'Employer' : ''} Account`}
-            </button>
-          </form>
-        </div>
+          </div>
 
-        <p style={{ textAlign: 'center', marginTop: '1.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-          Already have an account?{' '}
-          <Link href="/auth/login" style={{ color: '#a5b4fc', fontWeight: 600 }}>Sign in</Link>
-        </p>
+          {/* Error Message */}
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/30 text-destructive-foreground rounded-lg p-3 mb-4 text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Registration Form */}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Role Selection */}
+            <div className="space-y-2 mb-6">
+              <label className="text-sm font-medium">Select Your Role</label>
+              <div className="grid grid-cols-2 gap-3">
+                {roles.map((role) => {
+                  const Icon = role.icon;
+                  const isSelected = selectedRole === role.id;
+                  return (
+                    <button
+                      key={role.id}
+                      type="button"
+                      onClick={() => setValue('role', role.id as any)}
+                      className={cn(
+                        "p-4 rounded-xl border-2 transition-all text-left",
+                        isSelected
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border bg-muted/20 hover:border-border/80"
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Icon className={cn("w-6 h-6 flex-shrink-0 mt-0.5", isSelected ? "text-primary" : "text-muted-foreground")} />
+                        <div>
+                          <div className="font-semibold text-sm">{role.label}</div>
+                          <div className="text-xs text-muted-foreground">{role.description}</div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {errors.role && (
+                <p className="text-xs text-destructive">{errors.role.message}</p>
+              )}
+            </div>
+
+            {/* Full Name */}
+            <div className="space-y-2">
+              <label htmlFor="name" className="text-sm font-medium">
+                Full Name
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  id="name"
+                  type="text"
+                  placeholder="John Doe"
+                  {...register('name')}
+                  className={cn(
+                    "w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
+                    errors.name && "border-destructive"
+                  )}
+                />
+              </div>
+              {errors.name && (
+                <p className="text-xs text-destructive">{errors.name.message}</p>
+              )}
+            </div>
+
+            {/* Email */}
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium">
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  {...register('email')}
+                  className={cn(
+                    "w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
+                    errors.email && "border-destructive"
+                  )}
+                />
+              </div>
+              {errors.email && (
+                <p className="text-xs text-destructive">{errors.email.message}</p>
+              )}
+            </div>
+
+            {/* Password */}
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  {...register('password')}
+                  className={cn(
+                    "w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
+                    errors.password && "border-destructive"
+                  )}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+              {errors.password && (
+                <p className="text-xs text-destructive">{errors.password.message}</p>
+              )}
+            </div>
+
+            {/* Confirm Password */}
+            <div className="space-y-2">
+              <label htmlFor="confirmPassword" className="text-sm font-medium">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  {...register('confirmPassword')}
+                  className={cn(
+                    "w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
+                    errors.confirmPassword && "border-destructive"
+                  )}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+              {errors.confirmPassword && (
+                <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
+              )}
+            </div>
+
+            {/* Terms and Conditions */}
+            <div className="mt-4">
+              <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-1 rounded border-border bg-input"
+                  required
+                />
+                <span>
+                  I agree to the <Link href="#" className="text-primary hover:underline">Terms of Service</Link> and <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>
+                </span>
+              </label>
+            </div>
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              className="w-full mt-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <UserPlus className="w-4 h-4 mr-2" />
+              )}
+              {isLoading ? 'Creating Account...' : 'Create Account'}
+            </Button>
+          </form>
+
+          {/* Sign In Link */}
+          <div className="mt-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              Already have an account?{' '}
+              <Link
+                href="/auth/login"
+                className="text-primary font-semibold hover:underline"
+              >
+                Sign In
+              </Link>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,36 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Et_vacancy
+
+Et_vacancy is a TypeScript-based Next.js job marketplace for Ethiopian job seekers and employers. The app features authentication, role-aware dashboards, job search and filtering, application tracking, and a modern UI built with reusable components.
+
+## Features
+
+- Next.js 16 + React 19 App Router project
+- TypeScript support with ESLint validation
+- Credentials authentication with NextAuth
+- Employer and job seeker role-based pages
+- Job search, filtering, and saved jobs
+- Apply to jobs with CV upload simulation
+- Employer dashboard with applicant status tracking
+- Mock data-powered app flow for rapid local development
+- Prisma schema configured for SQLite
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 20 or newer
+- npm
+
+### Install dependencies
+
+```bash
+npm install
+```
+
+### Run development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 in your browser.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### Build for production
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+```
 
-## Learn More
+### Start production server
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run start
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Lint the project
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run lint
+```
 
-## Deploy on Vercel
+## Project Structure
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `app/` - page routes, auth, dashboards, and layout
+- `components/` - UI components and reusable elements
+- `lib/` - utilities and mock data
+- `prisma/` - Prisma schema for SQLite
+- `public/` - static assets and images
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Key Pages
+
+- `/` - home landing page
+- `/jobs` - searchable job listings
+- `/jobs/[id]` - job detail and apply flow
+- `/companies` - company browse page
+- `/auth/login` - login page
+- `/auth/register` - registration page
+- `/auth/forgot-password` - password reset page
+- `/dashboard` - user dashboard
+- `/employer/dashboard` - employer dashboard
+- `/employer/jobs/create` - job posting form
+
+## Notes
+
+- Currently the app relies on mock data from `lib/mock-data.ts`.
+- Prisma is configured for SQLite in `prisma/schema.prisma`.
+- The form flows and UI are ready for integration with a real backend.
+
+## Recommended Commands
+
+- `npm install`
+- `npm run dev`
+- `npm run build`
+- `npm run lint`
+
+## Troubleshooting
+
+- If the development server does not start, check `npm install` output for dependency issues.
+- If build fails, run `npm run lint` to identify code issues.
+- Use `npm install` again after updating packages.

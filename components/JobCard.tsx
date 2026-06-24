@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 
 interface Job {
@@ -53,7 +54,16 @@ export default function JobCard({ job }: JobCardProps) {
           border: '1px solid var(--glass-border)', overflow: 'hidden',
           fontWeight: 700, fontSize: '1rem', color: 'white',
         }}>
-          {companyLogo ? <img src={companyLogo} alt={companyName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+          {companyLogo ? (
+            <Image
+              src={companyLogo}
+              alt={companyName}
+              width={52}
+              height={52}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              unoptimized
+            />
+          ) : initials}
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>

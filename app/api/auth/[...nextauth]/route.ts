@@ -1,7 +1,8 @@
 import NextAuth from 'next-auth';
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { mockUsers } from '@/lib/mock-data';
+import prisma from '@/lib/prisma';
+import bcrypt from 'bcryptjs';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -18,17 +19,20 @@ export const authOptions: NextAuthOptions = {
         }
 
         console.log('Attempting login for:', credentials.email);
-        const user = mockUsers.find(
-          u => u.email === credentials.email && u.password === credentials.password
-        );
-
-        if (user) {
-          console.log('Login successful for:', user.email, 'role:', user.role);
-          return { id: user.id, name: user.name, email: user.email, role: user.role };
+        const user = await prisma.user.findUnique({ where: { email: credentials.email } });
+        if (!user || !user.password) {
+          console.log('Invalid credentials for:', credentials.email);
+          return null;
         }
 
-        console.log('Invalid credentials for:', credentials.email);
-        return null;
+        const ok = await bcrypt.compare(credentials.password, user.password);
+        if (!ok) {
+          console.log('Invalid credentials for:', credentials.email);
+          return null;
+        }
+
+        console.log('Login successful for:', user.email, 'id:', user.id);
+        return { id: user.id, name: user.name, email: user.email, role: user.role };
       }
     })
   ],

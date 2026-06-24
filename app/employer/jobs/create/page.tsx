@@ -230,7 +230,7 @@ export default function CreateJobPage() {
           {step === 3 && (
             <div>
               <div className="alert alert-info" style={{ marginBottom: '1.5rem' }}>
-                👀 Preview how your job will appear to candidates. Click "Publish" when you're happy.
+                👀 Preview how your job will appear to candidates. Click Publish when you&apos;re happy.
               </div>
 
               <div className="glass-panel" style={{ padding: '2rem', marginBottom: '1rem' }}>

@@ -12,7 +12,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Et_vacancy – Find Your Dream Job in Ethiopia & Beyond",
-  description: "Ethiopia's premier job vacancy platform. Discover verified job openings, connect with top employers, and accelerate your career.",
+  description: "Ethiopia&apos;s premier job vacancy platform. Discover verified job openings, connect with top employers, and accelerate your career.",
   keywords: "jobs, vacancy, Ethiopia, employment, career, hiring",
 };
 

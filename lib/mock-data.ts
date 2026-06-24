@@ -4,7 +4,7 @@ export interface User {
   name: string;
   email: string;
   password: string;
-  role: 'JOB_SEEKER' | 'EMPLOYER';
+  role: 'ADMIN' | 'JOB_SEEKER' | 'EMPLOYER';
 }
 
 export interface Company {
@@ -54,38 +54,9 @@ export interface Job {
   applicantsCount: number;
 }
 
-export const mockUsers: User[] = [
-  {
-    id: '1',
-    name: 'Abebe Bekele',
-    email: 'test@example.com',
-    password: 'password123',
-    role: 'JOB_SEEKER',
-  },
-  {
-    id: '2',
-    name: 'Ethio Telecom',
-    email: 'employer@example.com',
-    password: 'password123',
-    role: 'EMPLOYER',
-  },
-];
+export const mockUsers: User[] = [];
 
-export const mockCompanies: Company[] = [
-  {
-    id: '2',
-    name: 'Ethio Telecom',
-    industry: 'Telecommunications',
-    location: 'Addis Ababa',
-    size: '10,000+ employees',
-    website: 'https://ethiotelecom.et',
-    isVerified: true,
-    description: 'Ethiopia\'s leading telecommunications company providing mobile, internet and fixed-line services.',
-    rating: 4.5,
-    reviews: 128,
-    ownerId: '2'
-  }
-];
+export const mockCompanies: Company[] = [];
 
 export let mockJobs: Job[] = [];
 
@@ -95,13 +66,13 @@ export function addJob(
   job: Omit<Job, 'id' | 'company' | 'postedAt' | 'isVerified' | 'applicantsCount'>,
   employerId: string
 ) {
-  const company = mockCompanies.find(c => c.ownerId === employerId) || mockCompanies[0];
+  const company = (mockCompanies.find(c => c.ownerId === employerId) || mockCompanies[0]) as Company;
 
   const newJob: Job = {
     ...job,
     id: String(mockJobs.length + 1),
     company,
-    postedAt: new Date().toISOString().split('T')[0],
+    postedAt: (new Date().toISOString().split('T')[0]) as string,
     isVerified: true,
     applicantsCount: 0,
   };
@@ -116,7 +87,7 @@ export function addApplication(
     ...app,
     id: String(mockApplications.length + 1),
     status: 'PENDING',
-    appliedAt: new Date().toISOString().split('T')[0],
+    appliedAt: (new Date().toISOString().split('T')[0]) as string,
   };
   mockApplications.push(newApp);
   

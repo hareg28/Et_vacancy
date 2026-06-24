@@ -221,8 +221,9 @@ export default function JobDetailPage() {
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>PDF, DOC, DOCX (max 5MB)</p>
                   <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }} id="cv-upload" 
                     onChange={(e) => {
-                      if (e.target.files?.length) {
-                        setForm(prev => ({ ...prev, cvUrl: e.target.files![0].name }));
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setForm(prev => ({ ...prev, cvUrl: file.name }));
                         setErrors({});
                       }
                     }} />
@@ -243,7 +244,7 @@ export default function JobDetailPage() {
                   <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span>📄</span>
                     <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{form.cvUrl}</span>
-                    <button type="button" onClick={() => setForm(prev => ({ ...prev, cvUrl: '' })} style={{ marginLeft: 'auto', color: 'var(--text-muted)', padding: '0.25rem' }}>✕</button>
+                    <button type="button" onClick={() => setForm(prev => ({ ...prev, cvUrl: '' }))} style={{ marginLeft: 'auto', color: 'var(--text-muted)', padding: '0.25rem' }}>✕</button>
                   </div>
                 )}
               </div>

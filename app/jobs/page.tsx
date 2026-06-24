@@ -1,6 +1,5 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import JobCard from '@/components/JobCard';
 import { mockJobs } from '@/lib/mock-data';
@@ -32,10 +31,18 @@ const CATEGORIES = [
 ];
 
 export default function JobsPage() {
-  const searchParams = useSearchParams();
-  const [search, setSearch] = useState(searchParams.get('q') || '');
-  const [location, setLocation] = useState(searchParams.get('location') || '');
-  const [category, setCategory] = useState(searchParams.get('category') || 'All');
+  const [search, setSearch] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return new URLSearchParams(window.location.search).get('q') || '';
+  });
+  const [location, setLocation] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return new URLSearchParams(window.location.search).get('location') || '';
+  });
+  const [category, setCategory] = useState(() => {
+    if (typeof window === 'undefined') return 'All';
+    return new URLSearchParams(window.location.search).get('category') || 'All';
+  });
   const [jobType, setJobType] = useState('All');
   const [expLevel, setExpLevel] = useState('All');
   const [isRemote, setIsRemote] = useState(false);
@@ -44,15 +51,6 @@ export default function JobsPage() {
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [jobs, setJobs] = useState(mockJobs);
 
-  // Sync with search params
-  useEffect(() => {
-    const q = searchParams.get('q');
-    const loc = searchParams.get('location');
-    const cat = searchParams.get('category');
-    if (q) setSearch(q);
-    if (loc) setLocation(loc);
-    if (cat) setCategory(cat);
-  }, [searchParams]);
 
   // Refresh jobs periodically
   useEffect(() => {

@@ -103,7 +103,7 @@ export default function EmployerDashboardPage() {
                 </tr></thead>
                 <tbody>
                   {mockApplications.slice(0, 5).map(app => {
-                    const conf = STATUS_COLORS[app.status] || STATUS_COLORS.PENDING;
+                    const conf = (STATUS_COLORS[app.status] || STATUS_COLORS.PENDING) as { bg: string; color: string };
                     return (
                       <tr key={app.id}>
                         <td style={{ fontWeight: 600 }}>{app.jobSeekerName}</td>
@@ -182,7 +182,7 @@ export default function EmployerDashboardPage() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {filteredApps.map(app => {
-                const conf = STATUS_COLORS[app.status] || STATUS_COLORS.PENDING;
+                const conf = (STATUS_COLORS[app.status] || STATUS_COLORS.PENDING) as { bg: string; color: string };
                 return (
                   <div key={app.id} className="glass-panel" style={{ padding: '1.5rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>

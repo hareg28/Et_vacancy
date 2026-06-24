@@ -9,7 +9,7 @@ export default function AboutPage() {
           <span className="badge badge-purple" style={{ marginBottom: '1.25rem', display: 'inline-flex' }}>🇪🇹 Our Story</span>
           <h1 className="section-title">About <span className="gradient-text">Et_vacancy</span></h1>
           <p className="section-subtitle" style={{ maxWidth: 600, margin: '0.75rem auto 0' }}>
-            We're on a mission to connect Ethiopia's workforce with opportunities that matter — transparently, efficiently, and at scale.
+            We&apos;re on a mission to connect Ethiopia&apos;s workforce with opportunities that matter — transparently, efficiently, and at scale.
           </p>
         </div>
 

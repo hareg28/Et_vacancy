@@ -34,7 +34,7 @@ export default function ForgotPasswordPage() {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🔑</div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '0.5rem' }}>Forgot Password?</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No worries. Enter your email and we'll send you a reset link.</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No worries. Enter your email and we&apos;ll send you a reset link.</p>
         </div>
 
         <div className="glass-panel" style={{ padding: '2rem' }}>
