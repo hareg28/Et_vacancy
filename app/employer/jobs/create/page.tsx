@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { addJob } from '@/lib/mock-data';
 
 const JOB_CATEGORIES = ['Technology', 'Finance & Banking', 'Healthcare', 'Engineering', 'Education', 'Marketing', 'Logistics', 'NGO / Non-Profit', 'Telecommunications', 'Manufacturing'];
 
@@ -15,7 +14,7 @@ export default function CreateJobPage() {
     title: '', category: '', location: '', isRemote: false, jobType: 'FULL_TIME',
     expLevel: 'MID', salaryMin: '', salaryMax: '', deadline: '',
     description: '', requirements: '', benefits: '', skills: '',
-    isFeatured: false,
+    isFeatured: false, companyName: '',
   });
   const [submitted, setSubmitted] = useState(false);
 
@@ -30,28 +29,36 @@ export default function CreateJobPage() {
 
   const updateForm = (field: string, value: string | boolean) => setForm(prev => ({ ...prev, [field]: value }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const newJobData = {
-      title: form.title,
-      category: form.category,
-      location: form.location,
-      isRemote: form.isRemote,
-      jobType: form.jobType,
-      expLevel: form.expLevel,
-      salary: form.salaryMin && form.salaryMax ? `${form.salaryMin} – ${form.salaryMax} ETB` : 'Competitive',
-      deadline: form.deadline,
-      description: form.description,
-      requirements: form.requirements,
-      benefits: form.benefits,
-      tags: form.skills.split(',').map(s => s.trim()).filter(Boolean),
-      isFeatured: form.isFeatured,
-    };
+    const salary = form.salaryMin && form.salaryMax ? `${form.salaryMin} – ${form.salaryMax} ETB` : 'Competitive';
 
-    const employerId = (session?.user as any)?.id || '2';
-    addJob(newJobData, employerId);
-    setSubmitted(true);
+    const res = await fetch('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: form.title,
+        categoryName: form.category,
+        location: form.location,
+        isRemote: form.isRemote,
+        jobType: form.jobType,
+        experienceLevel: form.expLevel,
+        salary,
+        deadline: form.deadline || null,
+        description: form.description,
+        requirements: form.requirements,
+        benefits: form.benefits,
+        isFeatured: form.isFeatured,
+      }),
+    });
+
+    if (res.ok) {
+      setSubmitted(true);
+    } else {
+      const data = await res.json();
+      alert(data.error || 'Failed to post job');
+    }
   };
 
   if (submitted) {
@@ -64,7 +71,7 @@ export default function CreateJobPage() {
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1rem' }}>Redirecting to dashboard...</p>
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
             <Link href="/employer/dashboard" className="btn-secondary">Go to Dashboard Now</Link>
-            <button className="btn-primary" onClick={() => { setSubmitted(false); setStep(1); setForm({ title: '', category: '', location: '', isRemote: false, jobType: 'FULL_TIME', expLevel: 'MID', salaryMin: '', salaryMax: '', deadline: '', description: '', requirements: '', benefits: '', skills: '', isFeatured: false }); }}>
+            <button className="btn-primary" onClick={() => { setSubmitted(false); setStep(1); setForm({ title: '', category: '', location: '', isRemote: false, jobType: 'FULL_TIME', expLevel: 'MID', salaryMin: '', salaryMax: '', deadline: '', description: '', requirements: '', benefits: '', skills: '', isFeatured: false, companyName: '' }); }}>
               Post Another Job
             </button>
           </div>
@@ -116,6 +123,11 @@ export default function CreateJobPage() {
               <div className="form-group">
                 <label className="form-label">Job Title *</label>
                 <input className="form-input" placeholder="e.g. Senior Software Engineer" value={form.title} onChange={e => updateForm('title', e.target.value)} required />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Company Name *</label>
+                <input className="form-input" placeholder="e.g. Ethio Telecom" value={form.companyName} onChange={e => updateForm('companyName', e.target.value)} required />
               </div>
 
               <div className="grid-2">
@@ -178,7 +190,7 @@ export default function CreateJobPage() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <button type="button" className="btn-primary" onClick={() => setStep(2)} disabled={!form.title || !form.category || !form.location || !form.deadline}>
+                <button type="button" className="btn-primary" onClick={() => setStep(2)} disabled={!form.title || !form.companyName || !form.category || !form.location || !form.deadline}>
                   Next: Job Details →
                 </button>
               </div>
@@ -244,7 +256,7 @@ export default function CreateJobPage() {
                     </div>
                     <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.4rem' }}>{form.title}</h2>
                     <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                      Ethio Telecom · 📍 {form.location} {form.salaryMin && form.salaryMax ? `· 💰 ${form.salaryMin} – ${form.salaryMax} ETB` : ''}
+                      {form.companyName || 'Your Company'} · 📍 {form.location} {form.salaryMin && form.salaryMax ? `· 💰 ${form.salaryMin} – ${form.salaryMax} ETB` : ''}
                     </div>
                   </div>
                 </div>

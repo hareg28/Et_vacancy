@@ -1,305 +1,311 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { mockJobs, mockApplications } from '@/lib/mock-data';
+import { Loader2, PlusCircle } from 'lucide-react';
+import DashboardShell from '@/components/DashboardShell';
 
-const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  PENDING:     { bg: 'rgba(245,158,11,0.1)',  color: '#fbbf24' },
-  SHORTLISTED: { bg: 'rgba(99,102,241,0.15)', color: '#a5b4fc' },
-  INTERVIEWED: { bg: 'rgba(59,130,246,0.1)',  color: '#93c5fd' },
-  ACCEPTED:    { bg: 'rgba(16,185,129,0.1)',  color: '#6ee7b7' },
-  REJECTED:    { bg: 'rgba(244,63,94,0.1)',   color: '#fb7185' },
+const STATUS_COLORS: Record<string, { bg: string; color: string; label: string }> = {
+  PENDING: { bg: 'rgba(245,158,11,0.12)', color: '#b45309', label: 'Under Review' },
+  SHORTLISTED: { bg: 'rgba(16,185,129,0.12)', color: '#047857', label: 'Shortlisted' },
+  INTERVIEWED: { bg: 'rgba(37,99,235,0.12)', color: '#1d4ed8', label: 'Interviewed' },
+  ACCEPTED: { bg: 'rgba(16,185,129,0.12)', color: '#047857', label: 'Hired' },
+  REJECTED: { bg: 'rgba(239,68,68,0.12)', color: '#dc2626', label: 'Rejected' },
+};
+const DEFAULT_STATUS = STATUS_COLORS.PENDING!;
+
+type TabKey = 'overview' | 'jobs' | 'applicants';
+
+type Job = {
+  id: string;
+  title: string;
+  isPublished: boolean;
+  isClosed: boolean;
+  deadline: string | null;
+  createdAt: string;
+  _count: { applications: number };
 };
 
-type TabKey = 'overview' | 'jobs' | 'applicants' | 'messages' | 'settings';
+type Application = {
+  id: string;
+  status: string;
+  cvUrl: string | null;
+  createdAt: string;
+  user: { name: string | null; email: string | null };
+  job: { title: string; company: { name: string } };
+};
+
+function jobStatus(job: Job) {
+  if (job.isClosed) return { label: 'Closed', bg: 'rgba(239,68,68,0.12)', color: '#dc2626' };
+  if (!job.isPublished) return { label: 'Draft', bg: 'rgba(245,158,11,0.12)', color: '#b45309' };
+  return { label: 'Active', bg: 'rgba(16,185,129,0.12)', color: '#047857' };
+}
 
 export default function EmployerDashboardPage() {
   const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [filterStatus, setFilterStatus] = useState('ALL');
-  const [scheduleOpen, setScheduleOpen] = useState<string | null>(null);
-  const [, forceUpdate] = useState(0);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Periodically refresh
-  useEffect(() => {
-    const interval = setInterval(() => forceUpdate(prev => prev + 1), 1000);
-    return () => clearInterval(interval);
+  const fetchData = useCallback(async () => {
+    const [jobsRes, appsRes] = await Promise.all([
+      fetch('/api/jobs?mine=true'),
+      fetch('/api/applications?employer=true'),
+    ]);
+    if (jobsRes.ok) setJobs(await jobsRes.json());
+    if (appsRes.ok) setApplications(await appsRes.json());
+    setLoading(false);
   }, []);
 
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetchData();
+    });
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  const updateApplicationStatus = async (id: string, status: string) => {
+    await fetch(`/api/applications/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    fetchData();
+  };
+
+  const closeJob = async (id: string) => {
+    await fetch(`/api/jobs/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isClosed: true }),
+    });
+    fetchData();
+  };
+
+  const deleteJob = async (id: string) => {
+    if (!confirm('Delete this job?')) return;
+    await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
+    fetchData();
+  };
+
+  const activeJobs = jobs.filter((job) => job.isPublished && !job.isClosed);
+  const filteredApps = filterStatus === 'ALL' ? applications : applications.filter((app) => app.status === filterStatus);
+
   const stats = [
-    { label: 'Active Jobs', value: mockJobs.filter(j => j.isVerified).length, icon: '💼', color: '#a5b4fc' },
-    { label: 'Total Applicants', value: mockApplications.length, icon: '👥', color: '#6ee7b7' },
-    { label: 'Interviews Scheduled', value: mockApplications.filter(a => a.status === 'INTERVIEWED').length, icon: '🎙️', color: '#fbbf24' },
-    { label: 'Positions Filled', value: mockApplications.filter(a => a.status === 'ACCEPTED').length, icon: '✅', color: '#10b981' },
+    { label: 'Active Jobs', value: activeJobs.length, trend: '+2 from last month' },
+    { label: 'Total Applications', value: applications.length, trend: '+10% from last month' },
+    { label: 'Under Review', value: applications.filter((app) => app.status === 'PENDING').length, trend: 'Needs attention' },
+    { label: 'Hires', value: applications.filter((app) => app.status === 'ACCEPTED').length, trend: '+7% from last month' },
   ];
 
-  const filteredApps = filterStatus === 'ALL' ? mockApplications : mockApplications.filter(a => a.status === filterStatus);
-
-  const tabs: { key: TabKey; label: string }[] = [
-    { key: 'overview', label: '📊 Overview' },
-    { key: 'jobs', label: '💼 My Jobs' },
-    { key: 'applicants', label: '👥 Applicants' },
-    { key: 'messages', label: '💬 Messages' },
-    { key: 'settings', label: '⚙️ Company Settings' },
-  ];
+  if (loading) {
+    return (
+      <div className="dashboard-ui dashboard-ui-employer flex items-center justify-center min-h-screen gap-2 text-slate-500">
+        <Loader2 className="w-5 h-5 animate-spin" /> Loading dashboard...
+      </div>
+    );
+  }
 
   return (
-    <div className="page-content">
-      <div className="container">
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #6366f1, #10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.2rem', color: 'white' }}>
-              {session?.user?.name ? session.user.name.substring(0, 2).toUpperCase() : 'ET'}
-            </div>
-            <div>
-              <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.02em' }}>{session?.user?.name || 'Your Company'}</h1>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Employer Dashboard</p>
-            </div>
+    <DashboardShell
+      role="employer"
+      title="Employer Dashboard"
+      subtitle={session?.user?.name || 'Manage hiring activity from one place'}
+      action={<Link href="/employer/jobs/create" className="dash-action"><PlusCircle size={15} /> Post New Job</Link>}
+    >
+      <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid #e8ecf4', marginBottom: '1.25rem' }}>
+        {[
+          { key: 'overview', label: 'Overview' },
+          { key: 'jobs', label: 'My Jobs' },
+          { key: 'applicants', label: 'Candidates' },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key as TabKey)}
+            style={{
+              padding: '0.72rem 1rem',
+              fontWeight: 750,
+              fontSize: '0.82rem',
+              color: activeTab === tab.key ? '#2563eb' : '#64748b',
+              borderBottom: `2px solid ${activeTab === tab.key ? '#2563eb' : 'transparent'}`,
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'overview' && (
+        <>
+          <div className="dash-grid dash-grid-4" style={{ marginBottom: '1.5rem' }}>
+            {stats.map((stat) => (
+              <div key={stat.label} className="dash-card dash-card-pad">
+                <div className="dash-stat-label">{stat.label}</div>
+                <div className="dash-stat-value">{stat.value}</div>
+                <div className="dash-stat-trend">{stat.trend}</div>
+              </div>
+            ))}
           </div>
-          <Link href="/employer/jobs/create" className="btn-primary">
-            + Post New Job
-          </Link>
-        </div>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: '0.25rem', borderBottom: '1px solid var(--border-color)', marginBottom: '2rem', overflowX: 'auto' }}>
-          {tabs.map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
-              padding: '0.75rem 1.25rem', fontWeight: 600, fontSize: '0.875rem',
-              color: activeTab === tab.key ? '#a5b4fc' : 'var(--text-muted)',
-              borderBottom: `2px solid ${activeTab === tab.key ? '#6366f1' : 'transparent'}`,
-              background: 'transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s',
-            }}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── OVERVIEW ── */}
-        {activeTab === 'overview' && (
-          <>
-            <div className="grid-4 stagger-children" style={{ marginBottom: '2.5rem' }}>
-              {stats.map(s => (
-                <div key={s.label} className="stat-card animate-fade-in-up">
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <div>
-                      <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
-                      <div className="stat-label">{s.label}</div>
-                    </div>
-                    <span style={{ fontSize: '1.75rem' }}>{s.icon}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Recent Applications */}
-            <h2 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '1rem' }}>Recent Applications</h2>
-            <div className="table-wrapper">
-              <table>
-                <thead><tr>
-                  <th>Candidate</th><th>Position</th><th>Applied</th><th>Status</th><th>Action</th>
-                </tr></thead>
+          <div className="dash-grid dash-grid-2">
+            <div className="dash-card dash-card-pad">
+              <h2 className="dash-section-title">Recent Applications</h2>
+              <table className="dash-table">
+                <thead><tr><th>Candidate</th><th>Position</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody>
-                  {mockApplications.slice(0, 5).map(app => {
-                    const conf = (STATUS_COLORS[app.status] || STATUS_COLORS.PENDING) as { bg: string; color: string };
+                  {applications.slice(0, 5).map((app) => {
+                    const conf = STATUS_COLORS[app.status] || DEFAULT_STATUS;
                     return (
                       <tr key={app.id}>
-                        <td style={{ fontWeight: 600 }}>{app.jobSeekerName}</td>
-                        <td style={{ color: 'var(--text-secondary)' }}>{app.jobTitle}</td>
-                        <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{new Date(app.appliedAt).toLocaleDateString()}</td>
-                        <td><span style={{ padding: '0.25rem 0.75rem', borderRadius: 99, fontSize: '0.78rem', fontWeight: 600, background: conf.bg, color: conf.color }}>{app.status}</span></td>
+                        <td>{app.user.name || 'Unnamed Candidate'}</td>
+                        <td>{app.job.title}</td>
+                        <td><span className="dash-pill" style={{ background: conf.bg, color: conf.color }}>{conf.label}</span></td>
                         <td>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <a href={app.cvUrl} className="btn-secondary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem' }}>📄 CV</a>
-                            {app.status === 'PENDING' && <button className="btn-primary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem' }} onClick={() => {}}>Shortlist</button>}
-                          </div>
+                          {app.status === 'PENDING' && (
+                            <button className="dash-action" style={{ minHeight: 28, padding: '0.25rem 0.55rem' }} onClick={() => updateApplicationStatus(app.id, 'SHORTLISTED')}>Shortlist</button>
+                          )}
                         </td>
                       </tr>
                     );
                   })}
+                  {applications.length === 0 && (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No applications yet</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
-          </>
-        )}
 
-        {/* ── JOBS ── */}
-        {activeTab === 'jobs' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.25rem' }}>
-              <Link href="/employer/jobs/create" className="btn-primary">+ Post New Job</Link>
-            </div>
-            {mockJobs.length === 0 ? (
-              <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
-                <h3 style={{ marginBottom: '1rem', fontWeight: 700 }}>No jobs posted yet</h3>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Get started by posting your first job!</p>
-                <Link href="/employer/jobs/create" className="btn-primary">Post Your First Job</Link>
-              </div>
-            ) : (
-              <div className="table-wrapper">
-                <table>
-                  <thead><tr><th>Job Title</th><th>Posted</th><th>Deadline</th><th>Applicants</th><th>Status</th><th>Actions</th></tr></thead>
-                  <tbody>
-                    {mockJobs.map(job => (
+            <div className="dash-card dash-card-pad">
+              <h2 className="dash-section-title">Jobs Overview</h2>
+              <table className="dash-table">
+                <thead><tr><th>Job Title</th><th>Applications</th><th>Status</th></tr></thead>
+                <tbody>
+                  {jobs.slice(0, 5).map((job) => {
+                    const st = jobStatus(job);
+                    return (
                       <tr key={job.id}>
-                        <td style={{ fontWeight: 600 }}>{job.title}</td>
-                        <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{new Date(job.postedAt).toLocaleDateString()}</td>
-                        <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{new Date(job.deadline).toLocaleDateString()}</td>
-                        <td><span className="badge badge-purple">{job.applicantsCount}</span></td>
-                        <td><span className={job.isVerified ? 'badge badge-green' : 'badge badge-rose'}>{job.isVerified ? 'ACTIVE' : 'DRAFT'}</span></td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <Link href={`/jobs/${job.id}`} className="btn-secondary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem' }}>View</Link>
-                            <button className="btn-danger" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem' }}>Delete</button>
-                            {job.isVerified && <button className="btn-secondary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem' }}>Close</button>}
-                          </div>
-                        </td>
+                        <td>{job.title}</td>
+                        <td>{job._count.applications}</td>
+                        <td><span className="dash-pill" style={{ background: st.bg, color: st.color }}>{st.label}</span></td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── APPLICANTS ── */}
-        {activeTab === 'applicants' && (
-          <div>
-            {/* Filter */}
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-              {['ALL', 'PENDING', 'SHORTLISTED', 'INTERVIEWED', 'ACCEPTED', 'REJECTED'].map(s => (
-                <button key={s} onClick={() => setFilterStatus(s)} style={{
-                  padding: '0.4rem 1rem', borderRadius: 99, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
-                  background: filterStatus === s ? 'rgba(99,102,241,0.2)' : 'transparent',
-                  border: `1px solid ${filterStatus === s ? '#6366f1' : 'var(--border-color)'}`,
-                  color: filterStatus === s ? '#a5b4fc' : 'var(--text-muted)', transition: 'all 0.2s',
-                }}>{s}</button>
-              ))}
+                    );
+                  })}
+                  {jobs.length === 0 && (
+                    <tr><td colSpan={3} style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No jobs posted yet</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
+          </div>
+        </>
+      )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {filteredApps.map(app => {
-                const conf = (STATUS_COLORS[app.status] || STATUS_COLORS.PENDING) as { bg: string; color: string };
-                return (
-                  <div key={app.id} className="glass-panel" style={{ padding: '1.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                        <div className="avatar">{app.jobSeekerName.split(' ').map(n => n[0]).join('')}</div>
-                        <div>
-                          <h4 style={{ fontWeight: 700, marginBottom: '0.2rem' }}>{app.jobSeekerName}</h4>
-                          <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>{app.jobTitle}</p>
+      {activeTab === 'jobs' && (
+        <div className="dash-card dash-card-pad">
+          <h2 className="dash-section-title">My Jobs</h2>
+          {jobs.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center' }}>
+              <p style={{ color: '#64748b', marginBottom: '1rem' }}>No jobs posted yet</p>
+              <Link href="/employer/jobs/create" className="dash-action">Post Your First Job</Link>
+            </div>
+          ) : (
+            <table className="dash-table">
+              <thead><tr><th>Job Title</th><th>Posted</th><th>Deadline</th><th>Applicants</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                {jobs.map((job) => {
+                  const st = jobStatus(job);
+                  return (
+                    <tr key={job.id}>
+                      <td>{job.title}</td>
+                      <td>{new Date(job.createdAt).toLocaleDateString()}</td>
+                      <td>{job.deadline ? new Date(job.deadline).toLocaleDateString() : '-'}</td>
+                      <td>{job._count.applications}</td>
+                      <td><span className="dash-pill" style={{ background: st.bg, color: st.color }}>{st.label}</span></td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <Link href={`/jobs/${job.id}`} className="dash-action" style={{ minHeight: 28, padding: '0.25rem 0.55rem' }}>View</Link>
+                          {!job.isClosed && <button className="dash-action" style={{ minHeight: 28, padding: '0.25rem 0.55rem', background: '#64748b' }} onClick={() => closeJob(job.id)}>Close</button>}
+                          <button className="dash-action" style={{ minHeight: 28, padding: '0.25rem 0.55rem', background: '#ef4444' }} onClick={() => deleteJob(job.id)}>Delete</button>
                         </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span style={{ padding: '0.3rem 0.875rem', borderRadius: 99, fontSize: '0.78rem', fontWeight: 600, background: conf.bg, color: conf.color }}>{app.status}</span>
-                        <a href={app.cvUrl} className="btn-secondary" style={{ padding: '0.4rem 0.875rem', fontSize: '0.82rem' }}>📄 Download CV</a>
-                        {app.status === 'PENDING' && (
-                          <>
-                            <button className="btn-primary" style={{ padding: '0.4rem 0.875rem', fontSize: '0.82rem' }}>Shortlist</button>
-                            <button className="btn-danger" style={{ padding: '0.4rem 0.875rem', fontSize: '0.82rem' }}>Reject</button>
-                          </>
-                        )}
-                        {app.status === 'SHORTLISTED' && (
-                          <button className="btn-success" style={{ padding: '0.4rem 0.875rem', fontSize: '0.82rem' }} onClick={() => setScheduleOpen(app.id)}>
-                            Schedule Interview
-                          </button>
-                        )}
-                        {app.status === 'INTERVIEWED' && (
-                          <>
-                            <button className="btn-success" style={{ padding: '0.4rem 0.875rem', fontSize: '0.82rem' }}>Accept ✓</button>
-                            <button className="btn-danger" style={{ padding: '0.4rem 0.875rem', fontSize: '0.82rem' }}>Reject</button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
-            {/* Schedule Interview Modal */}
-            {scheduleOpen && (
-              <div style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setScheduleOpen(null)}>
-                <div className="glass-panel" style={{ padding: '2rem', maxWidth: 480, width: '100%' }} onClick={e => e.stopPropagation()}>
-                  <h3 style={{ fontWeight: 700, fontSize: '1.2rem', marginBottom: '1.5rem' }}>Schedule Interview</h3>
-                  <form onSubmit={e => { e.preventDefault(); setScheduleOpen(null); }}>
-                    <div className="form-group"><label className="form-label">Date & Time</label><input type="datetime-local" className="form-input" required /></div>
-                    <div className="form-group"><label className="form-label">Interview Type</label>
-                      <select className="form-select"><option>Video Call</option><option>In-Person</option><option>Phone Call</option></select>
-                    </div>
-                    <div className="form-group"><label className="form-label">Meeting Link (optional)</label><input type="url" className="form-input" placeholder="https://meet.google.com/..." /></div>
-                    <div className="form-group"><label className="form-label">Notes for Candidate</label><textarea className="form-textarea" style={{ minHeight: 80 }} /></div>
-                    <div style={{ display: 'flex', gap: '0.75rem' }}>
-                      <button type="button" className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setScheduleOpen(null)}>Cancel</button>
-                      <button type="submit" className="btn-primary" style={{ flex: 2, justifyContent: 'center' }}>Send Invitation</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
+      {activeTab === 'applicants' && (
+        <div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.2rem' }}>
+            {['ALL', 'PENDING', 'SHORTLISTED', 'INTERVIEWED', 'ACCEPTED', 'REJECTED'].map((status) => (
+              <button
+                key={status}
+                onClick={() => setFilterStatus(status)}
+                style={{
+                  padding: '0.4rem 1rem',
+                  borderRadius: 99,
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  background: filterStatus === status ? 'rgba(37,99,235,0.12)' : '#ffffff',
+                  border: `1px solid ${filterStatus === status ? '#2563eb' : '#e7ebf2'}`,
+                  color: filterStatus === status ? '#1d4ed8' : '#64748b',
+                }}
+              >
+                {status === 'ALL' ? 'All' : status.charAt(0) + status.slice(1).toLowerCase()}
+              </button>
+            ))}
           </div>
-        )}
 
-        {/* ── MESSAGES ── */}
-        {activeTab === 'messages' && (
-          <div className="glass-panel" style={{ padding: '2rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 0, border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden', minHeight: 400 }}>
-              {/* Contacts */}
-              <div style={{ borderRight: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
-                {['Abebe Bekele', 'Marta Girma', 'Dawit Alemu'].map((name, i) => (
-                  <div key={i} style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)', cursor: 'pointer', display: 'flex', gap: '0.75rem', alignItems: 'center', background: i === 0 ? 'rgba(99,102,241,0.1)' : 'transparent', transition: 'background 0.2s' }}>
-                    <div className="avatar avatar-sm">{name.split(' ').map(n => n[0]).join('')}</div>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{name}</div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Re: Senior Eng position</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {/* Chat */}
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-color)', fontWeight: 600 }}>Abebe Bekele</div>
-                <div style={{ flex: 1, padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ alignSelf: 'flex-start', background: 'var(--bg-tertiary)', borderRadius: '12px 12px 12px 4px', padding: '0.75rem 1rem', maxWidth: '70%', fontSize: '0.875rem' }}>
-                    Hello! I saw your application for the Senior Software Engineer role. Would you be available for an interview next week?
-                  </div>
-                  <div style={{ alignSelf: 'flex-end', background: 'rgba(99,102,241,0.2)', borderRadius: '12px 12px 4px 12px', padding: '0.75rem 1rem', maxWidth: '70%', fontSize: '0.875rem' }}>
-                    Yes, I am available Monday–Wednesday in the morning. Looking forward to it!
-                  </div>
-                </div>
-                <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '0.75rem' }}>
-                  <input className="form-input" placeholder="Type a message..." style={{ flex: 1 }} />
-                  <button className="btn-primary" style={{ padding: '0.65rem 1.25rem' }}>Send</button>
-                </div>
-              </div>
-            </div>
+          <div className="dash-card dash-card-pad">
+            <h2 className="dash-section-title">Candidates</h2>
+            <table className="dash-table">
+              <thead><tr><th>Candidate</th><th>Email</th><th>Position</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                {filteredApps.map((app) => {
+                  const conf = STATUS_COLORS[app.status] || DEFAULT_STATUS;
+                  return (
+                    <tr key={app.id}>
+                      <td>{app.user.name || 'Unnamed Candidate'}</td>
+                      <td>{app.user.email}</td>
+                      <td>{app.job.title}</td>
+                      <td><span className="dash-pill" style={{ background: conf.bg, color: conf.color }}>{conf.label}</span></td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          {app.status === 'PENDING' && (
+                            <>
+                              <button className="dash-action" style={{ minHeight: 28, padding: '0.25rem 0.55rem' }} onClick={() => updateApplicationStatus(app.id, 'SHORTLISTED')}>Shortlist</button>
+                              <button className="dash-action" style={{ minHeight: 28, padding: '0.25rem 0.55rem', background: '#ef4444' }} onClick={() => updateApplicationStatus(app.id, 'REJECTED')}>Reject</button>
+                            </>
+                          )}
+                          {app.status === 'SHORTLISTED' && (
+                            <button className="dash-action" style={{ minHeight: 28, padding: '0.25rem 0.55rem' }} onClick={() => updateApplicationStatus(app.id, 'INTERVIEWED')}>Mark Interviewed</button>
+                          )}
+                          {app.status === 'INTERVIEWED' && (
+                            <>
+                              <button className="dash-action" style={{ minHeight: 28, padding: '0.25rem 0.55rem' }} onClick={() => updateApplicationStatus(app.id, 'ACCEPTED')}>Accept</button>
+                              <button className="dash-action" style={{ minHeight: 28, padding: '0.25rem 0.55rem', background: '#ef4444' }} onClick={() => updateApplicationStatus(app.id, 'REJECTED')}>Reject</button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredApps.length === 0 && (
+                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No candidates in this category</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
-
-        {/* ── SETTINGS ── */}
-        {activeTab === 'settings' && (
-          <div className="glass-panel" style={{ padding: '2rem', maxWidth: 640 }}>
-            <h2 style={{ fontWeight: 700, fontSize: '1.2rem', marginBottom: '1.5rem' }}>Company Profile Settings</h2>
-            <form onSubmit={e => e.preventDefault()}>
-              <div className="form-group"><label className="form-label">Company Name</label><input className="form-input" defaultValue={session?.user?.name || 'Your Company'} /></div>
-              <div className="form-group"><label className="form-label">Industry</label><input className="form-input" defaultValue="Other" /></div>
-              <div className="form-group"><label className="form-label">Company Size</label>
-                <select className="form-select" defaultValue="1-10">
-                  <option value="1-10">1–10 employees</option><option value="11-50">11–50</option><option value="51-200">51–200</option>
-                  <option value="201-1000">201–1,000</option><option value="1001-10000">1,001–10,000</option><option value="10000+">10,000+</option>
-                </select>
-              </div>
-              <div className="form-group"><label className="form-label">Website</label><input type="url" className="form-input" /></div>
-              <div className="form-group"><label className="form-label">Location</label><input className="form-input" defaultValue="Addis Ababa, Ethiopia" /></div>
-              <div className="form-group"><label className="form-label">Description</label><textarea className="form-textarea" defaultValue="A new company hiring on Et_vacancy!" /></div>
-              <button type="submit" className="btn-primary">Save Changes</button>
-            </form>
-          </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </DashboardShell>
   );
 }

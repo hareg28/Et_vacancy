@@ -9,6 +9,7 @@ import {
   PlusCircle, 
   LogOut, 
   User, 
+  UserPlus,
   Building2, 
   Search, 
   Menu, 
@@ -26,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import ThemeToggle from '@/components/ThemeToggle';
 
 export default function Navbar() {
   const { data: session, status } = useSession();
@@ -35,26 +37,30 @@ export default function Navbar() {
   // Determine nav links based on user role
   const getNavLinks = () => {
     if (status === 'authenticated' && session?.user) {
-      const userRole = (session.user as any)?.role;
+      const userRole = session.user.role;
 
       if (userRole === 'ADMIN') {
         return [
-          { href: '/admin/dashboard', label: 'Admin Dashboard', icon: ShieldCheck },
-          { href: '/jobs', label: 'Manage Jobs', icon: BriefcaseBusiness },
-          { href: '/companies', label: 'Companies', icon: Building2 },
+          { href: '/admin/dashboard', label: 'Dashboard', icon: ShieldCheck },
+          { href: '/admin/users', label: 'Users', icon: User },
+          { href: '/admin/companies', label: 'Companies', icon: Building2 },
+          { href: '/employer/jobs/create', label: 'Post Job', icon: PlusCircle },
+          { href: '/jobs', label: 'Browse Jobs', icon: Search },
         ];
       }
 
       if (userRole === 'EMPLOYER') {
         return [
+          { href: '/', label: 'Home', icon: BriefcaseBusiness },
           { href: '/employer/dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { href: '/employer/jobs/create', label: 'Post Job', icon: PlusCircle },
-          { href: '/companies', label: 'Companies', icon: Building2 },
+          { href: '/jobs', label: 'Browse Jobs', icon: Search },
         ];
       }
 
       // Job Seeker links (default)
       return [
+        { href: '/', label: 'Home', icon: BriefcaseBusiness },
         { href: '/jobs', label: 'Find Jobs', icon: BriefcaseBusiness },
         { href: '/companies', label: 'Companies', icon: Building2 },
         { href: '/dashboard', label: 'My Applications', icon: LayoutDashboard },
@@ -63,6 +69,7 @@ export default function Navbar() {
 
     // Not authenticated links
     return [
+      { href: '/', label: 'Home', icon: BriefcaseBusiness },
       { href: '/jobs', label: 'Find Jobs', icon: BriefcaseBusiness },
       { href: '/companies', label: 'Companies', icon: Building2 },
     ];
@@ -109,6 +116,7 @@ export default function Navbar() {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           {status === 'authenticated' ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -124,7 +132,7 @@ export default function Navbar() {
                 <DropdownMenuLabel>
                   <div className="flex flex-col">
                     <span className="font-medium">{session.user?.name}</span>
-                    <span className="text-xs text-muted-foreground">{getRoleLabel((session.user as any)?.role)}</span>
+                    <span className="text-xs text-muted-foreground">{getRoleLabel(session.user.role)}</span>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -137,7 +145,18 @@ export default function Navbar() {
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => signOut()} className="text-rose-500 cursor-pointer">
+                <DropdownMenuLabel className="text-xs text-muted-foreground font-normal py-1">Switch / Add Account</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={() => signOut({ callbackUrl: '/auth/login' })} className="cursor-pointer">
+                  <User className="w-4 h-4 mr-2" />
+                  Sign In to Another Account
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => signOut({ callbackUrl: '/auth/register' })} className="cursor-pointer">
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Create New Account
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem onSelect={() => signOut()} className="text-rose-500 cursor-pointer">
                   <LogOut className="w-4 h-4 mr-2" />
                   Log Out
                 </DropdownMenuItem>

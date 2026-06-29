@@ -7,9 +7,10 @@ import { useSession, signIn } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Mail, Lock, LogIn, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, LogIn, Loader2, Eye, EyeOff, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/components/ThemeProvider';
 
 // Form validation schema
 const loginSchema = z.object({
@@ -22,6 +23,8 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { theme, toggleTheme } = useTheme();
+  const isDarkMode = theme === 'dark';
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
@@ -29,6 +32,7 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -66,8 +70,17 @@ export default function LoginPage() {
       if (result?.error) {
         setError('Invalid email or password');
       } else if (result?.ok) {
-        // Reload to update session immediately
-        window.location.reload();
+        // Fetch the updated session to get the role and redirect accordingly
+        const res = await fetch('/api/auth/session');
+        const sessionData = await res.json();
+        const role = sessionData?.user?.role;
+        if (role === 'ADMIN') {
+          router.push('/admin/dashboard');
+        } else if (role === 'EMPLOYER') {
+          router.push('/employer/dashboard');
+        } else {
+          router.push('/dashboard');
+        }
       }
     } catch (err) {
       setError('An error occurred. Please try again.');
@@ -76,19 +89,23 @@ export default function LoginPage() {
     }
   };
 
-  if (status === 'loading') {
-    return (
-      <div className="page-content auth-light flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
-    <div className="page-content auth-light flex items-center justify-center min-h-screen relative z-10">
+    <div className={`page-content flex items-center justify-center min-h-screen relative z-10`}>
       <div className="w-full max-w-md">
         <div className="glass-panel p-8">
-          {/* Header */}
+          {/* Theme Toggle */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="absolute top-4 right-4 p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            aria-label="Toggle dark mode"
+          >
+            {isDarkMode ? (
+              <Sun className="w-5 h-5 text-yellow-500" />
+            ) : (
+              <Moon className="w-5 h-5 text-gray-800" />
+            )}
+          </button>
           <div className="text-center mb-8">
             <h1 className="text-3xl font-extrabold tracking-tight mb-2">
               Welcome Back
@@ -98,25 +115,30 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Demo Credentials */}
-          <div className="bg-muted/30 border border-border rounded-lg p-4 mb-6">
-            <p className="text-sm font-semibold mb-2">Demo Credentials:</p>
-            <div className="text-xs space-y-1 text-muted-foreground">
-              <div><span className="font-medium">Admin:</span> admin@example.com / admin123</div>
-              <div><span className="font-medium">Job Seeker:</span> test@example.com / password123</div>
-              <div><span className="font-medium">Employer:</span> employer@example.com / password123</div>
-            </div>
-          </div>
-
           {/* Error Message */}
           {error && (
-            <div className="bg-destructive/10 border border-destructive/30 text-destructive-foreground rounded-lg p-3 mb-4 text-sm">
+            <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #f87171', padding: '0.75rem', borderRadius: '0.5rem', marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 'bold' }}>
               {error}
             </div>
           )}
 
+          <div className="mb-5 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-slate-700">
+            <div className="font-semibold text-slate-900">Admin dashboard access</div>
+            <div className="mt-1 text-xs text-slate-600">Use the seeded admin account to open the admin UI.</div>
+            <button
+              type="button"
+              className="mt-3 inline-flex h-8 items-center justify-center rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-indigo-700"
+              onClick={() => {
+                setValue('email', 'admin@vacancy.et', { shouldValidate: true });
+                setValue('password', 'admin123', { shouldValidate: true });
+              }}
+            >
+              Fill admin login
+            </button>
+          </div>
+
           {/* Login Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} method="POST" className="space-y-4">
             {/* Email */}
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium">
@@ -129,6 +151,7 @@ export default function LoginPage() {
                   type="email"
                   placeholder="you@example.com"
                   {...register('email')}
+                  style={{ padding: '0.6rem 0.75rem 0.6rem 2.5rem', backgroundColor: 'rgba(0,0,0,0.05)', width: '100%' }}
                   className={cn(
                     "w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
                     errors.email && "border-destructive"
@@ -160,6 +183,7 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   {...register('password')}
+                  style={{ padding: '0.6rem 2.5rem 0.6rem 2.5rem', backgroundColor: 'rgba(0,0,0,0.05)', width: '100%' }}
                   className={cn(
                     "w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
                     errors.password && "border-destructive"
@@ -185,7 +209,8 @@ export default function LoginPage() {
             {/* Submit Button */}
             <Button
               type="submit"
-              className="w-full mt-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700"
+              className="w-full mt-6 h-11"
+              style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', border: 'none' }}
               disabled={isLoading}
             >
               {isLoading ? (

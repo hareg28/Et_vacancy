@@ -2,16 +2,32 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
 
+const allowedRoles = new Set(['JOB_SEEKER', 'EMPLOYER']);
+
 export async function POST(request: Request) {
   try {
     const { name, email, password, role } = await request.json();
 
+    if (!name || String(name).trim().length < 2) {
+      return NextResponse.json({ error: 'Full name must be at least 2 characters' }, { status: 400 });
+    }
+
     if (!email || !password) {
-      return NextResponse.json({ error: 'Missing email or password' }, { status: 400 });
+      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+    }
+
+    if (String(password).length < 6) {
+      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
+    }
+
+    const requestedRole = role || 'JOB_SEEKER';
+    if (!allowedRoles.has(requestedRole)) {
+      return NextResponse.json({ error: 'Choose either Job Seeker or Employer registration' }, { status: 400 });
     }
 
     // Check if user already exists in DB
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existingUser) {
       return NextResponse.json({ error: 'User already exists with this email' }, { status: 409 });
     }
@@ -23,14 +39,14 @@ export async function POST(request: Request) {
     const created = await prisma.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         password: hashed,
-        role: role || 'JOB_SEEKER',
+        role: requestedRole,
       }
     });
 
     // If employer, create employer record and company placeholder
-    if (role === 'EMPLOYER') {
+    if (requestedRole === 'EMPLOYER') {
       const employer = await prisma.employer.create({
         data: { userId: created.id }
       });
@@ -47,7 +63,7 @@ export async function POST(request: Request) {
       });
     }
 
-    console.log('New user registered:', email, 'role:', created.role);
+    console.log('New user registered:', normalizedEmail, 'role:', created.role);
 
     return NextResponse.json(
       { message: 'User created successfully', userId: created.id },
@@ -56,7 +72,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Registration error:', error);
     return NextResponse.json(
-      { error: 'Something went wrong' },
+      { error: error instanceof Error ? error.message : 'Something went wrong' },
       { status: 500 }
     );
   }

@@ -37,8 +37,12 @@ const typeLabels: Record<string, string> = {
 };
 
 export default function JobCard({ job }: JobCardProps) {
-  const companyName = typeof job.company === 'string' ? job.company : job.company.name;
-  const companyLogo = typeof job.company === 'object' ? job.company.logoUrl : null;
+  const companyName = !job.company
+    ? 'Unknown Company'
+    : typeof job.company === 'string'
+    ? job.company
+    : job.company.name || 'Unknown Company';
+  const companyLogo = job.company && typeof job.company === 'object' ? job.company.logoUrl : null;
   const initials = companyName.substring(0, 2).toUpperCase();
   const jobType = job.jobType || 'FULL_TIME';
 

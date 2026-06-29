@@ -1,4 +1,5 @@
 // Shared mock data store
+
 export interface User {
   id: string;
   name: string;
@@ -54,47 +55,75 @@ export interface Job {
   applicantsCount: number;
 }
 
+// In-memory stores
 export const mockUsers: User[] = [];
-
 export const mockCompanies: Company[] = [];
-
 export let mockJobs: Job[] = [];
-
 export let mockApplications: Application[] = [];
 
+/**
+ * Add Job
+ */
 export function addJob(
   job: Omit<Job, 'id' | 'company' | 'postedAt' | 'isVerified' | 'applicantsCount'>,
-  employerId: string
+  employerId: string,
+  companyName?: string
 ) {
-  const company = (mockCompanies.find(c => c.ownerId === employerId) || mockCompanies[0]) as Company;
+  // Find existing company for this employer
+  let company = mockCompanies.find(c => c.ownerId === employerId);
+
+  // If not found, create new company
+  if (!company) {
+    company = {
+      id: crypto.randomUUID(),
+      name: companyName || 'My Company',
+      industry: job.category || 'General',
+      location: job.location || 'Ethiopia',
+      size: 'Unknown',
+      website: '',
+      isVerified: false,
+      description: '',
+      rating: 0,
+      reviews: 0,
+      ownerId: employerId,
+    };
+
+    mockCompanies.push(company);
+  }
 
   const newJob: Job = {
     ...job,
-    id: String(mockJobs.length + 1),
+    id: crypto.randomUUID(),
     company,
-    postedAt: (new Date().toISOString().split('T')[0]) as string,
+    postedAt: new Date().toISOString(),
     isVerified: true,
     applicantsCount: 0,
   };
+
   mockJobs.unshift(newJob);
   return newJob;
 }
 
+/**
+ * Add Application
+ */
 export function addApplication(
   app: Omit<Application, 'id' | 'status' | 'appliedAt'>
 ) {
   const newApp: Application = {
     ...app,
-    id: String(mockApplications.length + 1),
+    id: crypto.randomUUID(),
     status: 'PENDING',
-    appliedAt: (new Date().toISOString().split('T')[0]) as string,
+    appliedAt: new Date().toISOString(),
   };
+
   mockApplications.push(newApp);
-  
-  // Increment applicants count on job
+
+  // Update job applicant count safely
   const job = mockJobs.find(j => j.id === app.jobId);
   if (job) {
-    job.applicantsCount += 1;
+    job.applicantsCount = (job.applicantsCount || 0) + 1;
   }
+
   return newApp;
 }

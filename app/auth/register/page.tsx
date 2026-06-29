@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession, signIn } from 'next-auth/react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { User, Mail, Lock, UserPlus, Loader2, Eye, EyeOff, BriefcaseBusiness, Building2, ShieldCheck } from 'lucide-react';
+import { User, Mail, Lock, UserPlus, Loader2, Eye, EyeOff, BriefcaseBusiness, Building2, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/components/ThemeProvider';
 
 // Form validation schema
 const registerSchema = z.object({
@@ -28,15 +29,19 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 export default function RegisterPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { theme, toggleTheme } = useTheme();
+  const isDarkMode = theme === 'dark';
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
+
+
   const {
     register,
     handleSubmit,
-    setValue,
+    control,
     formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -49,7 +54,7 @@ export default function RegisterPage() {
     },
   });
 
-  const [selectedRole, setSelectedRole] = useState<'JOB_SEEKER' | 'EMPLOYER'>('JOB_SEEKER');
+  const watchedRole = useWatch({ control, name: 'role' });
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -84,7 +89,7 @@ export default function RegisterPage() {
 
       if (!registerResult.ok) {
         const errorData = await registerResult.json();
-        setError(errorData.message || 'Registration failed');
+        setError(errorData.error || errorData.message || 'Registration failed. Please check your details and try again.');
         return;
       }
 
@@ -98,7 +103,17 @@ export default function RegisterPage() {
       if (signInResult?.error) {
         setError('Registration succeeded, but login failed. Please sign in manually.');
       } else if (signInResult?.ok) {
-        window.location.reload();
+        // Fetch the updated session to get role and redirect accordingly
+        const res = await fetch('/api/auth/session');
+        const sessionData = await res.json();
+        const role = sessionData?.user?.role;
+        if (role === 'ADMIN') {
+          router.push('/admin/dashboard');
+        } else if (role === 'EMPLOYER') {
+          router.push('/employer/dashboard');
+        } else {
+          router.push('/dashboard');
+        }
       }
     } catch (err) {
       setError('An error occurred. Please try again.');
@@ -106,14 +121,6 @@ export default function RegisterPage() {
       setIsLoading(false);
     }
   };
-
-  if (status === 'loading') {
-    return (
-      <div className="page-content auth-light flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   const roles = [
     {
@@ -131,9 +138,23 @@ export default function RegisterPage() {
   ];
 
   return (
-    <div className="page-content auth-light flex items-center justify-center min-h-screen relative z-10">
+    <div className={`page-content flex items-center justify-center min-h-screen relative z-10`}>
       <div className="w-full max-w-lg">
         <div className="glass-panel p-8">
+            {/* Theme Toggle */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="absolute top-4 right-4 p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              aria-label="Toggle dark mode"
+            >
+              {isDarkMode ? (
+                <Sun className="w-5 h-5 text-yellow-500" />
+              ) : (
+                <Moon className="w-5 h-5 text-gray-800" />
+              )}
+            </button>
+
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-3xl font-extrabold tracking-tight mb-2">
@@ -146,40 +167,59 @@ export default function RegisterPage() {
 
           {/* Error Message */}
           {error && (
-            <div className="bg-destructive/10 border border-destructive/30 text-destructive-foreground rounded-lg p-3 mb-4 text-sm">
+            <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #f87171', padding: '0.75rem', borderRadius: '0.5rem', marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 'bold' }}>
               {error}
             </div>
           )}
 
           {/* Registration Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} method="POST" className="space-y-4">
             {/* Role Selection */}
-            <div className="space-y-2 mb-6">
+            <div className="space-y-2 mb-6" style={{ marginBottom: '1.5rem' }}>
               <label className="text-sm font-medium">Select Your Role</label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem' }}>
                 {roles.map((role) => {
                   const Icon = role.icon;
-                  const isSelected = selectedRole === role.id;
+                  const isSelected = watchedRole === role.id;
                   return (
-                    <button
-                      key={role.id}
-                      type="button"
-                      onClick={() => setValue('role', role.id as any)}
-                      className={cn(
-                        "p-4 rounded-xl border-2 transition-all text-left",
-                        isSelected
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border bg-muted/20 hover:border-border/80"
-                      )}
-                    >
-                      <div className="flex items-start gap-3">
-                        <Icon className={cn("w-6 h-6 flex-shrink-0 mt-0.5", isSelected ? "text-primary" : "text-muted-foreground")} />
-                        <div>
-                          <div className="font-semibold text-sm">{role.label}</div>
-                          <div className="text-xs text-muted-foreground">{role.description}</div>
+                    <div key={role.id}>
+                      <input 
+                        id={`role-${role.id}`}
+                        type="radio" 
+                        value={role.id}
+                        {...register('role')}
+                        style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+                      />
+                      <label
+                        htmlFor={`role-${role.id}`}
+                        style={{ 
+                          display: 'block',
+                          padding: '1rem', 
+                          width: '100%', 
+                          textAlign: 'left', 
+                          borderRadius: '0.75rem', 
+                          cursor: 'pointer',
+                          border: isSelected ? '2px solid #6366f1' : '2px solid #cbd5e1',
+                          backgroundColor: isSelected ? 'rgba(99,102,241,0.08)' : '#f8fafc',
+                          transition: 'all 0.2s ease-in-out',
+                          position: 'relative'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) e.currentTarget.style.borderColor = '#94a3b8';
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) e.currentTarget.style.borderColor = '#cbd5e1';
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                          <Icon style={{ width: 24, height: 24, flexShrink: 0, marginTop: 2, color: isSelected ? '#6366f1' : '#64748b' }} />
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '0.875rem', color: isSelected ? '#6366f1' : '#334155' }}>{role.label}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{role.description}</div>
+                          </div>
                         </div>
-                      </div>
-                    </button>
+                      </label>
+                    </div>
                   );
                 })}
               </div>
@@ -188,18 +228,19 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Full Name */}
+            {/* Name Field */}
             <div className="space-y-2">
               <label htmlFor="name" className="text-sm font-medium">
-                Full Name
+                {watchedRole === 'EMPLOYER' ? 'Company Name / Contact Name' : 'Full Name'}
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   id="name"
                   type="text"
-                  placeholder="John Doe"
+                  placeholder={watchedRole === 'EMPLOYER' ? 'Acme Corporation' : 'John Doe'}
                   {...register('name')}
+                  style={{ padding: '0.6rem 0.75rem 0.6rem 2.5rem', backgroundColor: 'rgba(0,0,0,0.05)', width: '100%' }}
                   className={cn(
                     "w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
                     errors.name && "border-destructive"
@@ -223,6 +264,7 @@ export default function RegisterPage() {
                   type="email"
                   placeholder="you@example.com"
                   {...register('email')}
+                  style={{ padding: '0.6rem 0.75rem 0.6rem 2.5rem', backgroundColor: 'rgba(0,0,0,0.05)', width: '100%' }}
                   className={cn(
                     "w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
                     errors.email && "border-destructive"
@@ -246,6 +288,7 @@ export default function RegisterPage() {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   {...register('password')}
+                  style={{ padding: '0.6rem 2.5rem 0.6rem 2.5rem', backgroundColor: 'rgba(0,0,0,0.05)', width: '100%' }}
                   className={cn(
                     "w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
                     errors.password && "border-destructive"
@@ -280,6 +323,7 @@ export default function RegisterPage() {
                   type={showConfirmPassword ? "text" : "password"}
                   placeholder="••••••••"
                   {...register('confirmPassword')}
+                  style={{ padding: '0.6rem 2.5rem 0.6rem 2.5rem', backgroundColor: 'rgba(0,0,0,0.05)', width: '100%' }}
                   className={cn(
                     "w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
                     errors.confirmPassword && "border-destructive"
@@ -319,7 +363,8 @@ export default function RegisterPage() {
             {/* Submit Button */}
             <Button
               type="submit"
-              className="w-full mt-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700"
+              className="w-full mt-6 h-11"
+              style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', border: 'none' }}
               disabled={isLoading}
             >
               {isLoading ? (

@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 const SKILLS = ['React', 'Node.js', 'TypeScript', 'Python', 'PostgreSQL', 'AWS'];
@@ -12,13 +12,36 @@ const EXPERIENCE = [
   { id: 'x1', company: 'TechCorp Ethiopia', title: 'Software Developer', location: 'Addis Ababa', startDate: '2020-07', endDate: '', current: true, description: 'Built and maintained React/Node.js applications for fintech clients.' },
 ];
 
+import { useSession } from 'next-auth/react';
+
 export default function ProfilePage() {
+  const { data: session } = useSession();
   const [activeSection, setActiveSection] = useState<string>('personal');
+  
+  // Use session data if available, fallback to default
   const [profile, setProfile] = useState({
-    name: 'Abebe Bekele', headline: 'Full-Stack Software Engineer', email: 'abebe@email.com',
-    phone: '+251 91 234 5678', location: 'Addis Ababa, Ethiopia', website: 'https://abebe.dev',
+    name: session?.user?.name || 'Abebe Bekele', 
+    headline: 'Full-Stack Software Engineer', 
+    email: session?.user?.email || 'abebe@email.com',
+    phone: '+251 91 234 5678', 
+    location: 'Addis Ababa, Ethiopia', 
+    website: 'https://abebe.dev',
     bio: 'Passionate software engineer with 5+ years of experience building scalable web applications. I specialize in React, Node.js, and cloud technologies.',
   });
+  
+  // Update profile if session changes after mount
+  useEffect(() => {
+    if (session?.user) {
+      queueMicrotask(() => {
+        setProfile(p => ({
+          ...p,
+          name: session.user?.name || p.name,
+          email: session.user?.email || p.email
+        }));
+      });
+    }
+  }, [session]);
+
   const [skills, setSkills] = useState<string[]>(SKILLS);
   const [newSkill, setNewSkill] = useState('');
   const [saved, setSaved] = useState(false);

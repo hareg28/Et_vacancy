@@ -29,20 +29,26 @@ const HOW_IT_WORKS = [
 
 export default function HomePage() {
   const { data: session, status } = useSession();
-  const [jobs, setJobs] = useState(mockJobs);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(true);
 
-  // Periodically refresh jobs
+  // Fetch jobs from database
   useEffect(() => {
-    const interval = setInterval(() => setJobs([...mockJobs]), 1000);
-    return () => clearInterval(interval);
+    const fetchJobs = async () => {
+      try {
+        const res = await fetch('/api/jobs');
+        if (res.ok) {
+          const data = await res.json();
+          setJobs(data);
+        }
+      } catch (err) {
+        console.error('Error fetching jobs:', err);
+      } finally {
+        setLoadingJobs(false);
+      }
+    };
+    fetchJobs();
   }, []);
-
-  const stats = [
-    { value: `${jobs.length}+`, label: 'Active Jobs', icon: '💼' },
-    { value: '3,200+', label: 'Companies', icon: '🏢' },
-    { value: '180,000+', label: 'Job Seekers', icon: '👥' },
-    { value: '94%', label: 'Success Rate', icon: '🎯' },
-  ];
 
   const getRoleDashboardLink = () => {
     const userRole = (session?.user as any)?.role;
@@ -60,25 +66,7 @@ export default function HomePage() {
   return (
     <div className="page-content">
 
-      {/* ── AUTH BANNER ── */}
-      {status === 'unauthenticated' && (
-        <div style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(16,185,129,0.05) 100%)', borderBottom: '1px solid rgba(99,102,241,0.2)', padding: '1rem 1.5rem' }}>
-          <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Welcome to Et_vacancy! </span>
-              <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Join thousands finding their dream job</span>
-            </div>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/auth/login">Sign In</Link>
-              </Button>
-              <Button asChild size="sm">
-                <Link href="/auth/register">Sign Up</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* ── ROLE-BASED ACCESS BANNER ── */}
       {status === 'authenticated' && session?.user && (
@@ -137,18 +125,28 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── STATS ── */}
+      {/* ── RECENT JOBS ── */}
       <section style={{ padding: '0 1.5rem 5rem' }}>
         <div className="container">
-          <div className="grid-4 stagger-children">
-            {stats.map(stat => (
-              <div key={stat.label} className="stat-card animate-fade-in-up" style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{stat.icon}</div>
-                <div className="stat-value gradient-text">{stat.value}</div>
-                <div className="stat-label">{stat.label}</div>
-              </div>
-            ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h2 className="section-title">Recently Posted <span className="gradient-text">Vacancies</span></h2>
+              <p className="section-subtitle">Discover the newest opportunities on Et_vacancy</p>
+            </div>
+            <Link href="/jobs" className="btn-secondary">View All Jobs →</Link>
           </div>
+
+          {loadingJobs ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Loading latest jobs...</div>
+          ) : jobs.length > 0 ? (
+            <div className="grid-3 stagger-children">
+              {jobs.slice(0, 6).map(job => <JobCard key={job.id} job={job} />)}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <p>No jobs posted yet. Check back soon!</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -171,22 +169,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── FEATURED JOBS ── */}
-      <section style={{ padding: '0 1.5rem 6rem' }}>
-        <div className="container">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-            <div>
-              <h2 className="section-title">Featured <span className="gradient-text">Vacancies</span></h2>
-              <p className="section-subtitle">Hand-picked opportunities from top Ethiopian companies</p>
-            </div>
-            <Link href="/jobs" className="btn-secondary">View All Jobs →</Link>
-          </div>
 
-          <div className="grid-3 stagger-children">
-            {jobs.slice(0, 3).map(job => <JobCard key={job.id} job={job} />)}
-          </div>
-        </div>
-      </section>
 
       {/* ── ROLE-BASED ACCESS ── */}
       <section style={{ padding: '0 1.5rem 6rem' }}>
@@ -347,6 +330,9 @@ export default function HomePage() {
                         <Button asChild variant="outline" style={{ fontSize: '1rem', padding: '0.8rem 2rem' }}>
                           <Link href="/employer/dashboard">View Dashboard</Link>
                         </Button>
+                        <Button asChild variant="outline" style={{ fontSize: '1rem', padding: '0.8rem 2rem' }}>
+                          <Link href="/jobs">Browse Jobs</Link>
+                        </Button>
                       </>
                     )}
                     {(session?.user as any)?.role === 'ADMIN' && (
@@ -402,7 +388,10 @@ export default function HomePage() {
             </div>
             <div>
               <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '1rem' }}>Company</div>
-              {['About Us', 'Blog', 'Privacy Policy', 'Terms & Conditions'].map(l => <Link key={l} href={`/${l.toLowerCase().replace(/ /g, '-')}`} style={{ display: 'block', marginBottom: '0.5rem' }}>{l}</Link>)}
+              <Link href="/about" style={{ display: 'block', marginBottom: '0.5rem' }}>About Us</Link>
+              <Link href="#" style={{ display: 'block', marginBottom: '0.5rem' }}>Blog</Link>
+              <Link href="#" style={{ display: 'block', marginBottom: '0.5rem' }}>Privacy Policy</Link>
+              <Link href="#" style={{ display: 'block', marginBottom: '0.5rem' }}>Terms & Conditions</Link>
             </div>
           </div>
           <div className="divider" />
